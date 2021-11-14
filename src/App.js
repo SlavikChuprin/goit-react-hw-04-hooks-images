@@ -1,4 +1,4 @@
-import { Component } from 'react';
+import { useEffect, useState } from 'react';
 import './App.css';
 import Searchbar from './components/Searchbar';
 import ImageGallery from './components/ImageGallery';
@@ -8,109 +8,96 @@ import Button from './components/Button/';
 import Modal from './components/Modal';
 import NotFound from './components/NotFound';
 
-class App extends Component {
-  state = {
-    request: '',
-    pics: [],
-    picForModal: '',
-    page: 1,
-    isLoading: false,
-    isError: false,
-  };
+function App() {
+  const [request, setRequest] = useState('');
+  const [pics, setPics] = useState([]);
+  const [picForModal, setpicForModal] = useState('');
+  const [page, setPage] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isError, setIsError] = useState(false);
+  const [showModal, setShowModal] = useState(false);
 
-  componentDidMount() {}
-  componentDidUpdate(prevProps, prevState) {
-    const prevRequest = prevState.request;
-    const nextRequest = this.state.request;
-    const prevPage = prevState.page;
-    const nextPage = this.state.page;
-
-    if (prevRequest !== nextRequest) {
-      this.fetchPic();
+  useEffect(() => {
+    if (!request) {
+      return;
     }
+    setPics([]);
 
-    if (prevPage !== nextPage && nextPage !== 1) {
-      this.fetchPic();
+    fetchPic(request, 1);
+  }, [request]);
+
+  useEffect(() => {
+    if (!request) {
+      return;
     }
-    window.scrollTo({
-      top: document.documentElement.scrollHeight,
-      behavior: 'smooth',
-    });
-  }
-  fetchPic = ({ request, page } = this.state) => {
-    this.setState({ isLoading: true });
+    if (page !== 1) {
+      fetchPic(request, page);
+    }
+  }, [page, request]);
+
+  const fetchPic = (request, page) => {
+    setIsError(false);
+    setIsLoading(true);
     picsAPI
       .fetchPictures(request, page)
       .then(res => {
+        setIsLoading(true);
         if (res.total === 0) {
-          this.setState({
-            isError: true,
-          });
+          setIsError(true);
         }
         return res;
       })
       .then(res => {
         res.hits.map(({ id, webformatURL, largeImageURL }) =>
-          this.setState(prevState => ({
-            pics: [...prevState.pics, { id, webformatURL, largeImageURL }],
-            isError: false,
-          })),
+          setPics(state => [...state, { id, webformatURL, largeImageURL }]),
         );
+        window.scrollTo({
+          top: document.documentElement.scrollHeight,
+          behavior: 'smooth',
+        });
       })
       .catch(error => {
-        this.setState({ error: error });
+        setIsError(error);
       })
-      .finally(() => this.setState({ isLoading: false }));
-  };
-  submitData = request => {
-    this.setState({ request, pics: [], page: 1 });
-  };
-  onPageChange = () => {
-    this.setState(({ page }) => ({ page: page + 1 }));
+      .finally(setIsLoading(false));
   };
 
-  onModalToggle = () => {
-    this.setState(({ showModal }) => ({
-      showModal: !showModal,
-    }));
+  const submitData = request => {
+    setRequest(request);
   };
-  onClickLargeImage = id => {
-    this.setState(({ pics }) => ({
-      picForModal: pics.find(pic => pic.id === id).largeImageURL,
-    }));
-    this.onModalToggle();
+  const onPageChange = () => {
+    setPage(state => state + 1);
   };
 
-  render() {
-    const { request, showModal, pics, picForModal, isLoading, isError } =
-      this.state;
+  const onModalToggle = () => {
+    setShowModal(!showModal);
+  };
+  const onClickLargeImage = id => {
+    setpicForModal(pics.find(pic => pic.id === id).largeImageURL);
+    onModalToggle();
+  };
 
-    return (
-      <div className="App">
-        <Searchbar onSubmit={this.submitData} />
-        {request === '' && (
-          <div> There will be pictures for you request...</div>
-        )}
-
-        {isLoading && <LoaderPics />}
-
-        {isError && <NotFound request={request} />}
+  return (
+    <div className="App">
+      <Searchbar onSubmit={submitData} />
+      {request === '' && <div> There will be pictures for you request...</div>}
+      {isError && <NotFound request={request} />}
+      <div>
         {pics.length !== 0 && (
-          <div>
-            <ImageGallery
-              pics={pics}
-              tag={request}
-              onClickForModal={this.onClickLargeImage}
-            />
-            <Button onClick={this.onPageChange} />
-          </div>
+          <ImageGallery
+            tag={request}
+            onClickForModal={onClickLargeImage}
+            pics={pics}
+          />
         )}
-        {showModal && (
-          <Modal pic={picForModal} tag={request} onClose={this.onModalToggle} />
-        )}
+        {isLoading && <LoaderPics />}
+        {pics.length >= 12 && <Button onClick={onPageChange} />}
       </div>
-    );
-  }
+      {showModal && (
+        <Modal pic={picForModal} tag={request} onClose={onModalToggle} />
+      )}
+    </div>
+  );
 }
 
 export default App;
